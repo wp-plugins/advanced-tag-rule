@@ -1,11 +1,11 @@
 <?php
 /*
   Plugin Name: Advanced Tag Rule
-  Plugin URI: http://www.selfit.org/
+  Plugin URI: http://bigcodeart.in.ua/
   Description: Add the advanced rules for your tags
-  Version: 1.0
+  Version: 1.1
   Author: Anton Shulga
-  Author URI: http://www.selfit.org/
+  Author URI: http://bigcodeart.in.ua/
   License: GPLv2 or later
   Text Domain: atr
  */
@@ -67,7 +67,7 @@ if (!class_exists('ATR_Plugin')) {
             self::$plugin_path = dirname(__FILE__);   // path to dir
             self::$plugin_url = trailingslashit(WP_PLUGIN_URL . '/' . dirname(self::$plugin_name)); //url to dir
             self::$prefix = 'atr';
-            self::$version = '1.0';
+            self::$version = '1.1';
         }
 
         public function load() {

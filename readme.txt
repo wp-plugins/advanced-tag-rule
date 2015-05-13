@@ -1,10 +1,10 @@
 === Advanced Tag Rule ===
 Contributors: BigTonny
-Donate link: http://www.selfit.org/
+Donate link: http://bigcodeart.in.ua/
 Tags: tags, rule
 Requires at least: 3.1
-Tested up to: 4.1
-Stable tag: 1.0
+Tested up to: 4.2.2
+Stable tag: 1.1
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,11 +43,15 @@ Simple deactivate it through the 'Plugins' menu in Wordpress
 2. Manage rules: add, edit, remove and save.
 
 == Changelog ==
+= Version 1.1 (May 13, 2015) =
+* Update for WP 4.2.2.
 
-= Version 1.0 (24 March, 2015) =
+= Version 1.0 (March 24, 2015) =
 * First release.
 
 == Upgrade Notice ==
+= 1.1 =
+The efficiency with version Wordpress 4.2.2
 
 = 1.0 =
 This version fixes a security related bug.
