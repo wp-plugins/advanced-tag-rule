@@ -3,7 +3,7 @@
   Plugin Name: Advanced Tag Rule
   Plugin URI: http://bigcodeart.in.ua/
   Description: Add the advanced rules for your tags
-  Version: 1.1
+  Version: 1.1.1
   Author: Anton Shulga
   Author URI: http://bigcodeart.in.ua/
   License: GPLv2 or later
@@ -28,6 +28,8 @@
 */
 
 if (!class_exists('ATR_Plugin')) {
+
+    register_uninstall_hook( __FILE__, array( 'ATR_Plugin', 'uninstall' ) );
 
     class ATR_Plugin {
 
@@ -67,7 +69,7 @@ if (!class_exists('ATR_Plugin')) {
             self::$plugin_path = dirname(__FILE__);   // path to dir
             self::$plugin_url = trailingslashit(WP_PLUGIN_URL . '/' . dirname(self::$plugin_name)); //url to dir
             self::$prefix = 'atr';
-            self::$version = '1.1';
+            self::$version = '1.1.1';
         }
 
         public function load() {
@@ -75,8 +77,6 @@ if (!class_exists('ATR_Plugin')) {
             register_activation_hook(self::$plugin_name, array(&$this, 'activate'));
             /* Register plugin activation hook. */
             register_deactivation_hook(self::$plugin_name, array(&$this, 'deactivate'));
-
-            register_uninstall_hook(self::$plugin_name, array(&$this, 'uninstall'));
 
             if ( !is_admin() ) {
                 add_action('init', array( &$this, 'verify_tag_rules') );
@@ -86,12 +86,22 @@ if (!class_exists('ATR_Plugin')) {
             /* "Tag Rules" - page */
             add_action('admin_menu', array(&$this, 'register_atr_page'));
             
-            add_action ( 'admin_enqueue_scripts', array (&$this, 'register_admin_assets' ) );            
-  
+            add_action ( 'admin_enqueue_scripts', array (&$this, 'register_admin_assets' ) );
+
+            /* Internationalize the text strings used. */
+            add_action('plugins_loaded', array(&$this, 'i18n'));  
         }
 
         function register_atr_page() {
             add_submenu_page('options-general.php', __('Advansed Tag Rules', self::$prefix), __('Tag Rules', self::$prefix), 'manage_options', 'atr-page', array($this, 'atr_template_output'));
+        }
+
+        /**
+         * Load the translation of the plugin.
+         */
+        public function i18n() {
+            /* Load the translation of the plugin. */
+            load_plugin_textdomain( self::$prefix, false, basename(self::$plugin_path) . '/lang' );
         }
         
         // change the tag-link for theme
@@ -145,68 +155,71 @@ if (!class_exists('ATR_Plugin')) {
             global $title;
 
             $notice = $rules = '';
-            $array_tags = get_tags();
-            
-            
+
+            printf('<h2>%s</h2>', $title);
+
+            $array_tags = get_tags() ? : array();
+  
+            if( empty($array_tags) ){
+                printf('<h4>%s</h4>', __('Tags not found.', 'atr'));
+                return;
+            }
             $args = array( 'posts_per_page' => -1,  'order'=> 'ASC', 'orderby' => 'title' );
             $postslist = new WP_Query( $args );
 
-            // ADD
-            if( !empty( $_POST['is_atr_submit'] ) ){
+            if( $array_tags && !empty($postslist) ){
+                // ADD
+                if( !empty( $_POST['is_atr_submit'] ) ){
+
+                    $array_atr_rules = get_option( 'atr_option' ) ? get_option( 'atr_option' ) : array();
+                    $array_atr_rules[] = array(
+                        'atr_tag' => $_POST['atr_tag'],
+                        'atr_redirect' => $_POST['atr_redirect']
+                    );
+
+                    $notice = ( update_option('atr_option', $array_atr_rules ) != false ) ? '<span style="color:green;">'. __('Saved successfully', 'atr').'</span>' : '';
+                }
+                // REMOVE
+                if( !empty( $_POST['is_atr_remove'] ) ){
+
+                    if( $_POST['atr_remove_rule'] == 'atr_all_tags' ){
+                        $notice = ( delete_option('atr_option') != false ) ? '<span style="color:green;">'. __('Rules removed successfully.', 'atr'). '</span>' : '<span style="color:red;">'. __('Rule are not removed.', 'atr') .'</span>';
+                    }else{
+                        $array_atr_rules = get_option( 'atr_option' ) ? get_option( 'atr_option' ) : array();
+
+                        foreach ($array_atr_rules as $key => $rule) {
+                            if( $rule['atr_tag'][0] == $_POST['atr_remove_rule'] ){
+                                unset($array_atr_rules[$key]);
+                                break;
+                            }
+                        }
+                        $notice = ( update_option('atr_option', $array_atr_rules ) != false ) ? '<span style="color:green;">'. __('Current rule removed successfully.', 'atr') .'</span>' : '';
+                    }
+
+                }
 
                 $array_atr_rules = get_option( 'atr_option' ) ? get_option( 'atr_option' ) : array();
-                $array_atr_rules[] = array(
-                    'atr_tag' => $_POST['atr_tag'],
-                    'atr_redirect' => $_POST['atr_redirect']
-                );
-                
-                $notice = ( update_option('atr_option', $array_atr_rules ) != false ) ? '<span style="color:green;">Saved successfully.</span>' : '';
-            }
-            // REMOVE
-            if( !empty( $_POST['is_atr_remove'] ) ){
-                
-                if( $_POST['atr_remove_rule'] == 'atr_all_tags' ){
-                    $notice = ( delete_option('atr_option') != false ) ? '<span style="color:green;">Rules removed successfully.</span>' : '<span style="color:red;">Rule are not removed</span>';
-                }else{
-                    $array_atr_rules = get_option( 'atr_option' ) ? get_option( 'atr_option' ) : array();
-                    
-                    foreach ($array_atr_rules as $key => $rule) {
-                        if( $rule['atr_tag'][0] == $_POST['atr_remove_rule'] ){
-                            unset($array_atr_rules[$key]);
-                            break;
-                        }
-                    }
-                    $notice = ( update_option('atr_option', $array_atr_rules ) != false ) ? '<span style="color:green;">Current rule removed successfully.</span>' : '';
+
+                $rules = $this->get_saving_tag_rules( $array_atr_rules );
+
+                $args_tag_hide = $args_tag_show = array();
+                $not_all_tags = $only_tags = array();
+
+                if( $rules  != false ){
+                    $args_tag_hide['exclude'] = $rules;
+                    $args_tag_show['include'] = $rules;
                 }
-                
-            }
 
-            $array_atr_rules = get_option( 'atr_option' ) ? get_option( 'atr_option' ) : array();
-      
-            $rules = $this->get_saving_tag_rules( $array_atr_rules );
-            
-            $args_tag_hide = $args_tag_show = array();
-            $not_all_tags = $only_tags = array();
-            
-            if( $rules  != false ){
-                $args_tag_hide['exclude'] = $rules;
-                $args_tag_show['include'] = $rules;
-            }
-            
-            $not_all_tags = get_tags( $args_tag_hide );
-            $only_tags = get_tags( $args_tag_show );
-
-            ?>
-                <h2><?php echo $title;?></h2>                
-
-                    <?php if( $array_tags && $postslist ){ ?>
+                $not_all_tags = get_tags( $args_tag_hide );
+                $only_tags = get_tags( $args_tag_show );
+                ?>                    
                     <form method="post" action="" name="tag_rule">
                         <table>
                             <?php
                             if( !empty($array_atr_rules) ){ ?>
                                 <tr>
-                                    <th>Tag</th>
-                                    <th>Post</th>
+                                    <th><?php _e('Tag', 'atr'); ?></th>
+                                    <th><?php _e('Post', 'atr'); ?></th>
                                 </tr>
                             <?php
                             }
@@ -243,7 +256,7 @@ if (!class_exists('ATR_Plugin')) {
                                     <?php
                                     if(!empty($array_atr_rules)){ ?>
                                         <input type="hidden" name="is_atr_submit" value="1"/>
-                                        <input type="submit" name="atr_submit" value="Save" class="button-primary"/>
+                                        <input type="submit" name="atr_submit" value="<?php _e('Save', 'atr'); ?>" class="button-primary"/>
                                     <?php
                                     }
                                     ?>
@@ -253,7 +266,7 @@ if (!class_exists('ATR_Plugin')) {
                                     <?php
                                     if( !empty($not_all_tags) ){
                                         ?>
-                                        <button type="button" id="attr_add_new_rule">Add rule</button>
+                                        <button type="button" id="attr_add_new_rule"><?php _e('Add rule', 'atr'); ?></button>
                                     <?php    
                                     }
                                     ?>
@@ -289,7 +302,7 @@ if (!class_exists('ATR_Plugin')) {
                                 </td>
                                 <td>
                                     <input type="hidden" name="is_atr_submit" value="1"/>
-                                    <input type="submit" name="atr_submit" value="Save" class="button-primary"/>
+                                    <input type="submit" name="atr_submit" value="<?php _e('Save', 'atr'); ?>" class="button-primary"/>
                                 </td>
                             </tr>
                     </table>
@@ -302,27 +315,27 @@ if (!class_exists('ATR_Plugin')) {
                             <table>
                                 <tr>
                                     <td>
-                                        <label for="atr_remove_rule">Remove rule:</label>
+                                        <label for="atr_remove_rule"><?php _e('Remove rule', 'atr'); ?>:</label>
                                         <select name="atr_remove_rule" class="atr_list_tags">
                                             <?php
                                             foreach ($only_tags as $tag) { ?>
                                                 <option value="<?php echo $tag->term_id; ?>"><?php echo $tag->name; ?></option>
                                             <?php }
                                             ?>
-                                                <option value="atr_all_tags">All Tags</option>
+                                                <option value="atr_all_tags"><?php _e('All Tags', 'atr'); ?></option>
                                         </select>
                                     </td>
                                     <td>
                                         <input type="hidden" name="is_atr_remove" value="1"/>
-                                        <input type="submit" name="atr_remove" value="Remove"  class="button-primary"/>
+                                        <input type="submit" name="atr_remove" value="<?php _e('Remove', 'atr'); ?>"  class="button-primary"/>
                                     </td>
                                 </tr>
                             </table>
                         </form>
                     </div>
                 <?php
-                    }
                 }
+            }
         }
 
         function verify_tag_rules(){
@@ -396,7 +409,10 @@ if (!class_exists('ATR_Plugin')) {
          * Do things on plugin uninstall.
          */
         function uninstall() {
-            return true;
+            if ( ! current_user_can( 'activate_plugins' ) )     return;
+            check_admin_referer( 'bulk-plugins' );
+
+            if ( __FILE__ != WP_UNINSTALL_PLUGIN )  	return;
         }
 
 
